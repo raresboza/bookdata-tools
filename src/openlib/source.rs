@@ -118,7 +118,8 @@ pub struct OLEditionRecord {
     pub works: Vec<Keyed>,
     #[serde(default)]
     pub authors: Vec<Author>,
-
+    #[serde(default)]
+    pub languages: Option<Vec<Keyed>>, // added for language thesis
     #[serde(flatten)]
     pub subjects: OLSubjects,
 }

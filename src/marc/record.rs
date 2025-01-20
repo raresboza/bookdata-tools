@@ -206,6 +206,13 @@ impl PartialEq<char> for Code {
     }
 }
 
+impl PartialEq<u8> for Code {
+    #[inline]
+    fn eq(&self, other: &u8) -> bool {
+        self.value == *other
+    }
+}
+
 impl FromStr for Code {
     type Err = ParseCodeError;
 

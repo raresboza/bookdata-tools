@@ -28,6 +28,14 @@ struct ISBNrec {
     tag: Option<String>,
 }
 
+/// Structure recording a Language record of a book
+#[derive(Serialize, ParquetRecordWriter, Debug)]
+struct LanguageRec{ // Added for Thesis 
+    rec_id: u32,
+    original_language: Option<String>,
+    translated_language: Option<String>,
+}
+
 /// Structure recording a record's author field.
 #[derive(Serialize, ParquetRecordWriter, Debug)]
 struct AuthRec {
@@ -43,6 +51,7 @@ pub struct BookOutput {
     ids: TableWriter<BookIds>,
     isbns: TableWriter<ISBNrec>,
     authors: TableWriter<AuthRec>,
+    languages: TableWriter<LanguageRec>,
 }
 
 impl BookOutput {
@@ -64,6 +73,10 @@ impl BookOutput {
         info!("writing book authors to {}", authfn);
         let authors = TableWriter::open(authfn)?;
 
+        let langfn = format!("{}-languages.parquet", prefix);
+        info!("writing book languages to {}", langfn);
+        let languages = TableWriter::open(langfn)?;
+
         Ok(BookOutput {
             n_books: 0,
             prefix: prefix.to_string(),
@@ -71,6 +84,7 @@ impl BookOutput {
             ids,
             isbns,
             authors,
+            languages,
         })
     }
 }
@@ -126,6 +140,35 @@ impl ObjectWriter<MARCRecord> for BookOutput {
                         }
                     }
                 }
+            } else if df.tag == 41 {
+                // language code
+                // first indicator
+                // 0 - item not a translation/does not include a translation
+                // 1 - item is or includes a translation
+                // subfield
+                // a - language code of the text
+                // h - language code of the original
+                let mut original_language: Option<String> = None;
+                let mut translated_language: Option<String> = None;
+                for sf in &df.subfields {
+                    if sf.code == 'a' {
+                      let content = sf.content.trim();
+                      if df.ind1 == 0 {
+                          original_language = Some(content.to_string());
+                      } else {
+                      // default is code 1
+                          translated_language = Some(content.to_string());
+                      }
+                    } else if sf.code == 'h' {
+                      let content = sf.content.trim();
+                      original_language = Some(content.to_string());
+                    }
+                }
+                self.languages.write_object(LanguageRec {
+                    rec_id,
+                    original_language,
+                    translated_language,
+                })?;
             } else if df.tag == 100 {
                 // authors: tag 100, subfield a
                 for sf in &df.subfields {
@@ -166,6 +209,7 @@ impl ObjectWriter<MARCRecord> for BookOutput {
         self.ids.finish()?;
         self.isbns.finish()?;
         self.authors.finish()?;
+        self.languages.finish()?;
         Ok(self.n_books as usize)
     }
 }

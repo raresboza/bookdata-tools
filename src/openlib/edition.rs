@@ -19,6 +19,7 @@ pub struct EditionRec {
     pub id: u32,
     pub key: String,
     pub title: Option<String>,
+    pub language_flag: u8, // added for master thesis - check meaning below
 }
 
 /// Link between edition and work.
@@ -107,11 +108,35 @@ impl ObjectWriter<Row<OLEditionRecord>> for EditionProcessor {
     fn write_object(&mut self, row: Row<OLEditionRecord>) -> Result<()> {
         self.last_id += 1;
         let id = self.last_id;
+        
+        // Changes done for master thesis
+        // Determine language flag
+        let language_flag = row.record.languages.as_ref().map_or(0, |langs| {
+            let mut has_eng = false;
+            let mut has_other = false;
+
+            for lang in langs {
+                if let Some(code) = lang.key.strip_prefix("/languages/") {
+                    match code {
+                        "eng" => has_eng = true,
+                        _ => has_other = true,
+                    }
+                }
+            }
+
+            match (has_eng, has_other) {
+                (false, false) => 0, // No languages
+                (true, false) => 1,  // Only English
+                (true, true) => 2,   // English and others
+                (false, true) => 3,  // Only others
+            }
+        });
 
         self.rec_writer.write_object(EditionRec {
             id,
             key: row.key.clone(),
             title: row.record.title.clone(),
+            language_flag,
         })?;
 
         self.save_isbns(id, row.record.isbn_10, clean_isbn_chars)?;
