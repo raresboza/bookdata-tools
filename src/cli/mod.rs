@@ -114,6 +114,10 @@ pub enum ClusterCommand {
     ExtractBooks(cluster::books::ExtractBooks),
     ExtractAuthors(cluster::authors::ClusterAuthors),
     ExtractAuthorGender(cluster::author_gender::AuthorGender),
+    ExtractAuthorLanguage(cluster::author_language::AuthorLanguage),
+    ExtractClusterOLLanguage(cluster::cluster_ol_language::ClusterOLLanguage),
+    ExtractClusterLocTranslation(cluster::cluster_ol_language::ClusterLocTranslation),
+    ExxtractClusterDeduceLanguage(cluster::cluster_ol_language::ClusterDeduceLanguage),
 }
 
 /// Entry point for the Book Data Tools.

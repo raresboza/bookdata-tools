@@ -10,6 +10,7 @@ mod arrow;
 mod cleaning;
 mod cli;
 mod gender;
+mod language;
 mod goodreads;
 mod graph;
 mod ids;
