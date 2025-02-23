@@ -195,7 +195,17 @@ impl WorkLanguageRow {
                 _ => {}
             };
         }
-        "test".to_string()
+
+        match (result_loc.as_str(), result_author.as_str(), result_ol.as_str()) {
+            ("eng", _, _) | (_, "eng", _) => "eng-original".to_string(),
+            ("other", _, "eng") | ("other", _, "both") => "other-translated".to_string(),
+            (_, "other", "eng") | (_, "other", "both") => "other-translated".to_string(),
+            ("other", "unknown", "other") | ("unknown", "other", "other") | ("other", "other", "other") => "other-translation-not-found".to_string(),
+            (_, _ , "eng") => "eng-original".to_string(),
+            (_, _, "other") => "other-translation-not-found".to_string(),
+            (_, _, "both") => "ambiguous".to_string(),
+            _ => "unknown".to_string(),
+        }
     }
     // Merge function to merge two WorkLanguageRow instances
     fn merge(&mut self, other: WorkLanguageRow) {
@@ -234,7 +244,7 @@ impl WorkLanguageRow {
         // merge language ol
         match(&self.language_ol, other.language_ol) {
             (None, Some(x)) => self.language_ol = Some(x),
-            (Some(x), Some(0)) => {},
+            (Some(_x), Some(0)) => {},
             (Some(0), Some(x)) => self.language_ol = Some(x),
             (Some(2), _) | (_, Some(2)) => self.language_ol = Some(2), 
             (Some(1), Some(3)) | (Some(3), Some(1)) => self.language_ol = Some(2),
@@ -246,7 +256,6 @@ impl WorkLanguageRow {
 
 #[inline(never)]
 pub fn cluster_derive_language() -> Result<HashMap<u32, WorkLanguageRow>> {
-    let mut map: HashMap<u32, u32> = HashMap::new();
     let author_lf = LazyFrame::scan_parquet("book-links/cluster-languages.parquet", Default::default())?;
     let mut author_df = author_lf.collect()?;
     let author_df = author_df.rename("language", "language_author")?;

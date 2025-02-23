@@ -108,6 +108,24 @@ fn save_merged_languages(work_merged_languages: HashMap<u32, clusters::WorkLangu
     Ok(())
 }
 
+#[derive(Serialize, Deserialize, Clone, ParquetRecordWriter)]
+struct GRWorkDeducedLanguage {
+    work_id: u32,
+    deduced_language: String,
+}
+
+fn save_deduced_languages(work_merged_languages: HashMap<u32, clusters::WorkLanguageRow>, outf: &Path) -> Result<()> {
+    info!("writing deduced_languages to {}", outf.display());
+    let mut out = TableWriter::open(outf)?;
+
+    for (work_id, languages) in work_merged_languages {
+        out.write_object(GRWorkDeducedLanguage { work_id: work_id.try_into().unwrap(), deduced_language: languages.deduce_language().try_into()?, })?;
+    }
+    out.finish()?;
+
+    Ok(())
+}
+
 impl Command for ClusterOLLanguage {
     fn exec(&self) -> Result<()> {
         let cluster_languages = clusters::openlib_cluster_language(&self.cluster_ol_lang_file)?;
@@ -129,8 +147,8 @@ impl Command for ClusterLocTranslation {
 impl Command for ClusterDeduceLanguage {
     fn exec(&self) -> Result<()> {
         let work_merged_languages = clusters::cluster_derive_language()?;
-        save_merged_languages(work_merged_languages, self.output.as_ref())?;
-
+        //save_merged_languages(work_merged_languages, self.output.as_ref())?;
+        save_deduced_languages(work_merged_languages, self.output.as_ref())?;
         Ok(())
     }
 }
