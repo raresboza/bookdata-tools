@@ -344,3 +344,98 @@ pub fn cluster_derive_language() -> Result<HashMap<u32, WorkLanguageRow>> {
     info!("length: {}", map.len());
     Ok(map)
 }
+
+#[derive(Debug, Default)]
+pub struct GRItemLanguageRow {
+    pub gr_item: u32,
+    pub deduced_language: String,
+
+}
+
+impl GRItemLanguageRow {
+    fn merge(&mut self, other: GRItemLanguageRow) {
+        //other-not-found into other-translation
+        if self.deduced_language == "other-translation-not-found".to_string() && other.deduced_language == "other-translated".to_string() {
+           self.deduced_language = other.deduced_language;
+        } else
+        // language ambiguous
+        if self.deduced_language == "ambiguous".to_string() && other.deduced_language != "unknown".to_string() {
+            self.deduced_language = other.deduced_language;
+        } else
+        // language unknown
+        if self.deduced_language == "unknown".to_string() {
+            self.deduced_language = other.deduced_language;
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct GRRatingLanguageRow {
+    pub gr_item: u32,
+    pub user_item: u32,
+    pub rating: u32,
+    pub deduced_language: String,
+
+}
+
+#[inline(never)]
+pub fn gr_work_to_id() -> Result<Vec<GRRatingLanguageRow>> {
+    let gr_item_languages_lf = LazyFrame::scan_parquet("goodreads/gr-item-languages.parquet", Default::default())?;
+    let gr_item_languages_df = gr_item_languages_lf.collect()?;
+
+    info!("Prepare rows for iteration...");
+    println!("{:?}", gr_item_languages_df.schema());
+    println!("Number of rows merged: {}", gr_item_languages_df.height());
+    let rows: Vec<GRItemLanguageRow> = gr_item_languages_df
+    .column("gr_item")?
+    .i32()?
+    .into_iter()
+    .zip(gr_item_languages_df.column("deduced_language")?.str()?.into_iter())
+    .map(|(gr_item, deduced_language)| {
+        GRItemLanguageRow {
+            gr_item: gr_item.unwrap() as u32, // Convert i32 to u32
+            deduced_language: deduced_language.unwrap().to_string(), // Convert Option<&str> to Option<String>
+        }
+    })
+    .collect();
+
+    let mut map: HashMap<u32, GRItemLanguageRow> = HashMap::new();
+    for row in rows {
+        if let Some(existing_row) = map.get_mut(&row.gr_item) {
+            // If it exists, merge the existing row with the new one
+            existing_row.merge(row);
+        } else {
+            // If it doesn't exist, insert the new row into the map
+            map.insert(row.gr_item, row);
+        }
+    }
+
+    info!("length: {}", map.len());
+
+    let gr_ratings_lf = LazyFrame::scan_parquet("goodreads/gr-work-ratings.parquet", Default::default())?;
+    let gr_ratings_df = gr_ratings_lf.collect()?;
+
+    info!("Prepare rows for iteration...");
+    println!("{:?}", gr_ratings_df.schema());
+    println!("Number of rows merged: {}", gr_ratings_df.height());
+
+    let rows: Vec<GRRatingLanguageRow> = gr_ratings_df
+    .column("user")?
+    .i32()?
+    .into_iter()
+    .zip(gr_ratings_df.column("item")?.i32()?.into_iter())
+    .zip(gr_ratings_df.column("rating")?.f32()?.into_iter())
+    .map(|((user, item), rating)| {
+        GRRatingLanguageRow {
+            gr_item: item.unwrap() as u32, // Convert i32 to u32
+            user_item: user.unwrap() as u32,
+            rating: rating.unwrap() as u32,
+            deduced_language: map.get(&(item.unwrap() as u32)).map(|s| s.deduced_language.clone()).unwrap_or("unknown".to_string()),
+            //deduced_language: map.get(&(item.unwrap() as u32)).unrwap().deduced_language.cloned().unwrap_or_else(|| "unknown".to_string()),
+        }
+    })
+    .collect();
+
+    info!("length: {}", rows.len());
+    Ok(rows)
+}

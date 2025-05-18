@@ -46,6 +46,13 @@ pub struct ClusterDeduceLanguage {
     output: PathBuf,
 }
 
+#[derive(Args, Debug)]
+#[command(name = "extract-gr-rating-language")]
+pub struct GRRatingLanguage {
+    /// Specify output file
+    #[arg(short = 'o', long = "output")]
+    output: PathBuf,
+}
 
 /// Record format for saving cluster ol information.
 #[derive(Serialize, Deserialize, Clone, ParquetRecordWriter)]
@@ -126,6 +133,29 @@ fn save_deduced_languages(work_merged_languages: HashMap<u32, clusters::WorkLang
     Ok(())
 }
 
+#[derive(Serialize, Deserialize, Clone, ParquetRecordWriter)]
+struct GRItemRatingLanguage {
+    user: u32,
+    item: u32,
+    rating: u32,
+    deduced_language: String,
+}
+
+fn save_ratings_with_languages(gr_ratings_language: Vec<clusters::GRRatingLanguageRow>, outf: &Path) -> Result<()> {
+    info!("writing ratings with languages to {}", outf.display());
+    let mut out = TableWriter::open(outf)?;
+
+    for row in gr_ratings_language {
+        out.write_object(GRItemRatingLanguage { user: row.user_item.try_into().unwrap(),
+                                                item: row.gr_item.try_into().unwrap(),
+                                                rating: row.rating.try_into().unwrap(),
+                                                deduced_language: row.deduced_language.try_into()?, })?;
+    }
+    out.finish()?;
+
+    Ok(())
+}
+
 impl Command for ClusterOLLanguage {
     fn exec(&self) -> Result<()> {
         let cluster_languages = clusters::openlib_cluster_language(&self.cluster_ol_lang_file)?;
@@ -149,6 +179,14 @@ impl Command for ClusterDeduceLanguage {
         let work_merged_languages = clusters::cluster_derive_language()?;
         //save_merged_languages(work_merged_languages, self.output.as_ref())?;
         save_deduced_languages(work_merged_languages, self.output.as_ref())?;
+        Ok(())
+    }
+}
+
+impl Command for GRRatingLanguage {
+    fn exec(&self) -> Result<()> {
+        let gr_ratings_language = clusters::gr_work_to_id()?;
+        save_ratings_with_languages(gr_ratings_language, self.output.as_ref())?;
         Ok(())
     }
 }

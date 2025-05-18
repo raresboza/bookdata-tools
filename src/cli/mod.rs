@@ -118,6 +118,7 @@ pub enum ClusterCommand {
     ExtractClusterOLLanguage(cluster::cluster_ol_language::ClusterOLLanguage),
     ExtractClusterLocTranslation(cluster::cluster_ol_language::ClusterLocTranslation),
     ExxtractClusterDeduceLanguage(cluster::cluster_ol_language::ClusterDeduceLanguage),
+    ExtractGrRatingLanguage(cluster::cluster_ol_language::GRRatingLanguage),
 }
 
 /// Entry point for the Book Data Tools.
